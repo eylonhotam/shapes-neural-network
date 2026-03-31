@@ -16,6 +16,7 @@ def generate_shape_data(num_samples=3000):
     
     images = []
     labels = []
+    print(f"[PROCESS] Generating {num_samples} synthetic shapes...")
     for _ in range(num_samples):
         img = np.zeros((64, 64), dtype=np.uint8)
         shape_type = np.random.randint(0, 3)
@@ -45,6 +46,7 @@ def generate_shape_data(num_samples=3000):
     # Convert to Torch Tensors [N, C, H, W] and normalize 0.0 - 1.0
     X = torch.tensor(np.array(images)).float().unsqueeze(1) / 255.0
     y = torch.tensor(labels).long()
+    print(f"[DEBUG] Data shape: {X.shape} | Max value: {X.max().item()} | Min: {X.min().item()}")
     return X, y
 
 # 3. Split dataset into training and validation
@@ -57,6 +59,9 @@ val_ds = TensorDataset(X_all[split:], y_all[split:])
 # Use DataLoader to prevent the model from getting stuck on one class
 train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_ds, batch_size=64, shuffle=False)
+print(f"[DEBUG] Training samples: {len(train_loader.dataset)}")
+print(f"[DEBUG] Validation samples: {len(val_loader.dataset)}")
+print(f"[LOG] Shuffling enabled for training to prevent class bias.")
 
 class ShapeWaveNet(nn.Module):
     def __init__(self):
@@ -84,10 +89,11 @@ class ShapeWaveNet(nn.Module):
         return x
 
 model = ShapeWaveNet().to(device)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+print(f"[DEBUG] Model initialized on {device}. Architecture ready.")
 
-# 5. Training 
+# 5. Training
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001) 
 epochs = 50
 print("Starting Training...")
 
@@ -134,15 +140,15 @@ def predict_shape(data):
         output = model(tensor_img.to(device))
         probs = torch.nn.functional.softmax(output, dim=1)[0]
 
-    labels = ["Square", "Triangle", "Circle"]
-    return {labels[i]: float(probs[i]) for i in range(3)}
+    print(f"[INFERENCE] Confidence -> Sq: {probs[0]:.2f}, Tri: {probs[1]:.2f}, Cir: {probs[2]:.2f}")
+    return {"Square": float(probs[0]), "Triangle": float(probs[1]), "Circle": float(probs[2])}
 
 # Launch UI
 interface = gr.Interface(
     fn=predict_shape,
     inputs=gr.Sketchpad(canvas_size=(300, 300), type="numpy"),
     outputs=gr.Label(num_top_classes=3),
-    title="Technion AI Lab: Shape Classifier",
+    title="Shape Classifier",
     description="Draw a shape! If it's still guessing Square, try drawing thicker lines."
 )
 
