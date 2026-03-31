@@ -4,213 +4,146 @@ import torch.optim as optim
 import numpy as np
 import cv2
 import gradio as gr
-import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader, TensorDataset
 
 print(f"Using PyTorch version: {torch.__version__}")
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Running on: {device}")
 
-def generate_inverted_data(num_samples=2000):
+def generate_shape_data(num_samples=3000):
+    # Generates shapes for training, background 0 and shape 1 for max difference.
+    
     images = []
     labels = []
     for _ in range(num_samples):
-        img = np.ones((64, 64), dtype=np.uint8) * 255
+        img = np.zeros((64, 64), dtype=np.uint8)
         shape_type = np.random.randint(0, 3)
 
-        center_x, center_y = np.random.randint(25, 39), np.random.randint(25, 39)
-        size = np.random.randint(12, 18)
+        
+        center_x = np.random.randint(20, 44)
+        center_y = np.random.randint(20, 44)
+        size = np.random.randint(10, 20)
         thickness = np.random.randint(1, 3)
 
-        if shape_type == 0:
-            cv2.rectangle(img, (center_x-size, center_y-size), (center_x+size, center_y+size), 0, thickness)
-        elif shape_type == 1:
+        if shape_type == 0: # Square
+            cv2.rectangle(img, (center_x-size, center_y-size), (center_x+size, center_y+size), 255, thickness)
+        elif shape_type == 1: # Triangle
             pts = np.array([[center_x, center_y-size], [center_x-size, center_y+size], [center_x+size, center_y+size]], np.int32)
-            cv2.polylines(img, [pts], True, 0, thickness)
-        else:
-            cv2.circle(img, (center_x, center_y), size, 0, thickness)
+            cv2.polylines(img, [pts], True, 255, thickness)
+        else: # Circle
+            cv2.circle(img, (center_x, center_y), size, 255, thickness)
 
-        angle = np.random.randint(-20, 20)
+        # Slight rotation in data
+        angle = np.random.randint(-30, 30)
         M = cv2.getRotationMatrix2D((32, 32), angle, 1.0)
-        img = cv2.warpAffine(img, M, (64, 64), borderValue=255)
+        img = cv2.warpAffine(img, M, (64, 64))
 
         images.append(img)
         labels.append(shape_type)
 
-    return torch.tensor(np.array(images)).float().unsqueeze(1) / 255.0, torch.tensor(labels)
+    # Convert to Torch Tensors [N, C, H, W] and normalize 0.0 - 1.0
+    X = torch.tensor(np.array(images)).float().unsqueeze(1) / 255.0
+    y = torch.tensor(labels).long()
+    return X, y
 
-X_all, y_all = generate_inverted_data(2500)
-
-# Split into train and validation sets
+# 3. Split dataset into training and validation
+X_all, y_all = generate_shape_data(4000)
 split = int(0.8 * len(X_all))
-X_train, y_train = X_all[:split], y_all[:split]
-X_val, y_val = X_all[split:], y_all[split:]
 
-print(f"Train: {len(X_train)} samples | Val: {len(X_val)} samples")
+train_ds = TensorDataset(X_all[:split], y_all[:split])
+val_ds = TensorDataset(X_all[split:], y_all[split:])
+
+# Use DataLoader to prevent the model from getting stuck on one class
+train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
+val_loader = DataLoader(val_ds, batch_size=64, shuffle=False)
 
 class ShapeWaveNet(nn.Module):
     def __init__(self):
         super(ShapeWaveNet, self).__init__()
-
-        self.wave1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.wave2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.dropout = nn.Dropout(0.25)
-        self.fc1 = nn.Linear(32 * 16 * 16, 128)
-        self.output_layer = nn.Linear(128, 3)
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+            nn.Dropout(0.25)
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(32 * 16 * 16, 128),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(128, 3)
+        )
 
     def forward(self, x):
-        x = self.pool(torch.relu(self.wave1(x)))
-        x = self.pool(torch.relu(self.wave2(x)))
-        x = x.view(-1, 32 * 16 * 16)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)  
-        x = self.output_layer(x)
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
         return x
 
 model = ShapeWaveNet().to(device)
-print("Model ready.")
-
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-epochs = 100
-print(f"Training for {epochs} rounds...")
+# 5. Training 
+epochs = 50
+print("Starting Training...")
 
 for epoch in range(epochs):
     model.train()
-    optimizer.zero_grad()
+    total_loss = 0
+    for batch_X, batch_y in train_loader:
+        batch_X, batch_y = batch_X.to(device), batch_y.to(device)
 
-    outputs = model(X_train.to(device))
-    loss = criterion(outputs, y_train.to(device))
-    loss.backward()
-    optimizer.step()
+        optimizer.zero_grad()
+        outputs = model(batch_X)
+        loss = criterion(outputs, batch_y)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
 
-    if (epoch + 1) % 10 == 0:
-        _, predicted = torch.max(outputs, 1)
-        train_acc = (predicted == y_train.to(device)).sum().item() / y_train.size(0) * 100
-
+    if (epoch + 1) % 5 == 0:
         model.eval()
+        correct = 0
         with torch.no_grad():
-            val_outputs = model(X_val.to(device))
-            _, val_predicted = torch.max(val_outputs, 1)
-            val_acc = (val_predicted == y_val.to(device)).sum().item() / y_val.size(0) * 100
-        model.train()
+            for vX, vy in val_loader:
+                vX, vy = vX.to(device), vy.to(device)
+                _, pred = torch.max(model(vX), 1)
+                correct += (pred == vy).sum().item()
 
-        print(f"Round {epoch+1:3d} | Loss: {loss.item():.4f} | Train Acc: {train_acc:.2f}% | Val Acc: {val_acc:.2f}%")
+        val_acc = (correct / len(val_ds)) * 100
+        print(f"Epoch {epoch+1} | Loss: {total_loss/len(train_loader):.4f} | Val Acc: {val_acc:.2f}%")
 
-print("Training Finished!")
+# 6. Drawing and Prediction Interface
+def predict_shape(data):
+    # Process drawing, make sure it's white on black
+    img_array = np.array(data['composite'][:, :, :3])
+    gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    resized = cv2.resize(gray, (64, 64))
 
-model.eval()
-with torch.no_grad():
-    outputs = model(X_train.to(device))
-    _, predicted = torch.max(outputs, 1)
-    acc = (predicted == y_train.to(device)).sum().item() / y_train.size(0) * 100
-    print(f"Train accuracy: {acc:.2f}%")
+    if resized.mean() > 127:
+        resized = 255 - resized
 
-    # Check distribution of predictions
-    for i, name in enumerate(["Square", "Triangle", "Circle"]):
-        count = (predicted == i).sum().item()
-        print(f"  Predicted as {name}: {count} times")
-
-def debug_predict(data):
-    img = data['composite'][:, :, 3]
-    img = cv2.resize(img, (64, 64))
-    img_inverted = 255 - img
-
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    axes[0].imshow(data['composite'])
-    axes[0].set_title("Raw Sketchpad (RGBA)")
-    axes[1].imshow(img, cmap='gray')
-    axes[1].set_title(f"Alpha channel\nmin={img.min()} max={img.max()}")
-    axes[2].imshow(img_inverted, cmap='gray')
-    axes[2].set_title(f"After inversion (fed to model)\nmin={img_inverted.min()} max={img_inverted.max()}")
-    plt.show()
-
-    img_tensor = torch.tensor(img_inverted).float().unsqueeze(0).unsqueeze(0) / 255.0
-    print(f"Tensor min: {img_tensor.min():.3f}, max: {img_tensor.max():.3f}, mean: {img_tensor.mean():.3f}")
+    # Scale 0-1
+    tensor_img = torch.tensor(resized).float().unsqueeze(0).unsqueeze(0) / 255.0
 
     model.eval()
     with torch.no_grad():
-        output = model(img_tensor.to(device))
+        output = model(tensor_img.to(device))
         probs = torch.nn.functional.softmax(output, dim=1)[0]
-        print(f"Raw logits: {output}")
-        print(f"Square: {probs[0]:.2%} | Triangle: {probs[1]:.2%} | Circle: {probs[2]:.2%}")
-
-# debug interface
-def debug_predict(data):
-    composite = np.array(data['composite'])
-    print(f"Composite shape: {composite.shape}, dtype: {composite.dtype}")
-    print(f"R channel mean: {composite[:,:,0].mean():.1f}")
-    print(f"G channel mean: {composite[:,:,1].mean():.1f}")
-    print(f"B channel mean: {composite[:,:,2].mean():.1f}")
-    if composite.shape[2] == 4:
-        print(f"A channel mean: {composite[:,:,3].mean():.1f}")
-
-    # Use RGB and convert to grayscale instead of alpha channel
-    img_rgb = composite[:, :, :3]
-    img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-
-    img_resized = cv2.resize(img, (64, 64))
-
-    # The sketchpad draws dark on light, so we invert to match training
-    img_inverted = 255 - img_resized
-
-    fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    axes[0].imshow(composite[:,:,:3])
-    axes[0].set_title(f"Raw RGB")
-    axes[1].imshow(img_resized, cmap='gray')
-    axes[1].set_title(f"Grayscale\nmin={img_resized.min()} max={img_resized.max()}")
-    axes[2].imshow(img_inverted, cmap='gray')
-    axes[2].set_title(f"After inversion\nmean={img_inverted.mean():.1f}")
-    plt.tight_layout()
-    plt.show()
-
-    img_tensor = torch.tensor(img_inverted).float().unsqueeze(0).unsqueeze(0) / 255.0
-    print(f"Tensor — min: {img_tensor.min():.3f}, max: {img_tensor.max():.3f}, mean: {img_tensor.mean():.3f}")
-
-    model.eval()
-    with torch.no_grad():
-        output = model(img_tensor.to(device))
-        probs = torch.nn.functional.softmax(output, dim=1)[0]
-        print(f"Raw logits: {output.cpu().numpy()}")
-        print(f"Square: {probs[0]:.2%} | Triangle: {probs[1]:.2%} | Circle: {probs[2]:.2%}")
 
     labels = ["Square", "Triangle", "Circle"]
     return {labels[i]: float(probs[i]) for i in range(3)}
 
-debug_interface = gr.Interface(
-    fn=debug_predict,
-    inputs=gr.Sketchpad(canvas_size=(300, 300), type="numpy"),
-    outputs=gr.Label(num_top_classes=3),
-    title="DEBUG: Shape Classifier",
-    description="Draw a shape — check the Colab output below for debug info"
-)
-
-debug_interface.launch(share=True, debug=True)
-
-def predict_image(data):
-    img = data['composite'][:, :, 3]
-    img = cv2.resize(img, (64, 64))
-
-    # FIX Bug #1: Invert so drawn strokes (255) become dark (0) on white (255) background
-    img = 255 - img
-
-    img_tensor = torch.tensor(img).float().unsqueeze(0).unsqueeze(0) / 255.0
-
-    model.eval()
-    with torch.no_grad():
-        output = model(img_tensor.to(device))
-        probabilities = torch.nn.functional.softmax(output, dim=1)[0]
-
-    labels = ["Square", "Triangle", "Circle"]
-    return {labels[i]: float(probabilities[i]) for i in range(3)}
-
+# Launch UI
 interface = gr.Interface(
-    fn=predict_image,
+    fn=predict_shape,
     inputs=gr.Sketchpad(canvas_size=(300, 300), type="numpy"),
     outputs=gr.Label(num_top_classes=3),
-    title="Shape Classifier",
-    description="Draw a shape in the center. The model will show its confidence levels below!"
+    title="Technion AI Lab: Shape Classifier",
+    description="Draw a shape! If it's still guessing Square, try drawing thicker lines."
 )
 
-interface.launch(share=True, debug=True)
+interface.launch(share=True)
