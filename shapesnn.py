@@ -138,31 +138,28 @@ def debug_predict(data):
 
 # debug interface
 def debug_predict(data):
-    if isinstance(data, dict):
-        composite = data['composite'] if data.get('composite') is not None else data['image']
-    else:
-        composite = data
-
-    composite = np.array(composite)
+    composite = np.array(data['composite'])
     print(f"Composite shape: {composite.shape}, dtype: {composite.dtype}")
+    print(f"R channel mean: {composite[:,:,0].mean():.1f}")
+    print(f"G channel mean: {composite[:,:,1].mean():.1f}")
+    print(f"B channel mean: {composite[:,:,2].mean():.1f}")
+    if composite.shape[2] == 4:
+        print(f"A channel mean: {composite[:,:,3].mean():.1f}")
 
-    if composite.ndim == 3 and composite.shape[2] == 4:
-        img = composite[:, :, 3]
-        print("Using alpha channel")
-    elif composite.ndim == 3 and composite.shape[2] == 3:
-        img = cv2.cvtColor(composite, cv2.COLOR_RGB2GRAY)
-        print("Using grayscale from RGB")
-    else:
-        img = composite
+    # Use RGB and convert to grayscale instead of alpha channel
+    img_rgb = composite[:, :, :3]
+    img = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
     img_resized = cv2.resize(img, (64, 64))
+
+    # The sketchpad draws dark on light, so we invert to match training
     img_inverted = 255 - img_resized
 
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-    axes[0].imshow(composite)
-    axes[0].set_title(f"Raw composite\nshape={composite.shape}")
+    axes[0].imshow(composite[:,:,:3])
+    axes[0].set_title(f"Raw RGB")
     axes[1].imshow(img_resized, cmap='gray')
-    axes[1].set_title(f"Extracted channel\nmin={img_resized.min()} max={img_resized.max()}")
+    axes[1].set_title(f"Grayscale\nmin={img_resized.min()} max={img_resized.max()}")
     axes[2].imshow(img_inverted, cmap='gray')
     axes[2].set_title(f"After inversion\nmean={img_inverted.mean():.1f}")
     plt.tight_layout()
@@ -186,7 +183,7 @@ debug_interface = gr.Interface(
     inputs=gr.Sketchpad(canvas_size=(300, 300), type="numpy"),
     outputs=gr.Label(num_top_classes=3),
     title="DEBUG: Shape Classifier",
-    description="Draw a shape — check the print output below for debug info"
+    description="Draw a shape — check the Colab output below for debug info"
 )
 
 debug_interface.launch(share=True, debug=True)
