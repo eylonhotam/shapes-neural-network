@@ -55,13 +55,15 @@ split = int(0.8 * len(X_all))
 
 train_ds = TensorDataset(X_all[:split], y_all[:split])
 val_ds = TensorDataset(X_all[split:], y_all[split:])
-
-# Use DataLoader to prevent the model from getting stuck on one class
 train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_ds, batch_size=64, shuffle=False)
+
+print(f"[DEBUG] Total Validation Samples (val_ds): {len(val_ds)}")
+print(f"[DEBUG] Total Validation Batches (val_loader): {len(val_loader)}")
 print(f"[DEBUG] Training samples: {len(train_loader.dataset)}")
 print(f"[DEBUG] Validation samples: {len(val_loader.dataset)}")
 print(f"[LOG] Shuffling enabled for training to prevent class bias.")
+
 
 class ShapeWaveNet(nn.Module):
     def __init__(self):
