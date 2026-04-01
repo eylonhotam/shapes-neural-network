@@ -6,15 +6,6 @@ Built with PyTorch. Originally developed in Google Colab.
 
 ---
 
-## Demo
-
-<!-- Replace with your actual demo GIF. Recommended: record with LICEcap or Kap, crop to the Gradio window, 600px wide -->
-![Demo](demo.gif)
-
-> *Draw a shape in the sketchpad — the model returns confidence scores for Square, Triangle, and Circle in real time.*
-
----
-
 ## How It Works
 
 **No dataset needed.** The model generates its own training data at runtime using OpenCV — 4,000 synthetic 64×64 grayscale images of squares, triangles, and circles, randomized in position, size, and rotation angle.
