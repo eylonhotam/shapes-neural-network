@@ -123,8 +123,17 @@ for epoch in range(epochs):
 
         val_acc = (correct / len(val_ds)) * 100
         print(f"Epoch {epoch+1} | Loss: {total_loss/len(train_loader):.4f} | Val Acc: {val_acc:.2f}%")
+        
+# Save model instead of retraining
+torch.save(model.state_dict(), 'shapewavenet.pth')
+print("[SAVED] Model saved to shapewavenet.pth")
 
 # 6. Drawing and Prediction Interface
+model = ShapeWaveNet().to(device)
+model.load_state_dict(torch.load('shapewavenet.pth', map_location=device))
+model.eval()
+print("[LOADED] Model loaded from shapewavenet.pth")
+
 def predict_shape(data, temperature=2.0):
     # Process drawing, make sure it's white on black
     img_array = np.array(data['composite'][:, :, :3])
