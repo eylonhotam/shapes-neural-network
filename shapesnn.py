@@ -125,7 +125,7 @@ for epoch in range(epochs):
         print(f"Epoch {epoch+1} | Loss: {total_loss/len(train_loader):.4f} | Val Acc: {val_acc:.2f}%")
 
 # 6. Drawing and Prediction Interface
-def predict_shape(data):
+def predict_shape(data, temperature=2.0):
     # Process drawing, make sure it's white on black
     img_array = np.array(data['composite'][:, :, :3])
     gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
