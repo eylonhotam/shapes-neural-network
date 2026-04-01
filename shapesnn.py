@@ -94,7 +94,7 @@ model = ShapeWaveNet().to(device)
 print(f"[DEBUG] Model initialized on {device}. Architecture ready.")
 
 # 5. Training
-criterion = nn.CrossEntropyLoss()
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
 optimizer = optim.Adam(model.parameters(), lr=0.001) 
 epochs = 50
 print("Starting Training...")
@@ -140,11 +140,22 @@ def predict_shape(data):
     model.eval()
     with torch.no_grad():
         output = model(tensor_img.to(device))
-        probs = torch.nn.functional.softmax(output, dim=1)[0]
+        scaled = output / temperature          # temperature scaling
+        probs = torch.nn.functional.softmax(scaled, dim=1)[0]
 
-    print(f"[INFERENCE] Confidence -> Sq: {probs[0]:.2f}, Tri: {probs[1]:.2f}, Cir: {probs[2]:.2f}")
+    top_prob = float(probs.max())
+    sorted_probs, _ = torch.sort(probs, descending=True)
+    margin = float(sorted_probs[0] - sorted_probs[1])
+
+    print(f"[INFERENCE] Temp: {temperature} | Confidence -> Sq: {probs[0]:.2f}, Tri: {probs[1]:.2f}, Cir: {probs[2]:.2f}")
+    print(f"[INFERENCE] Top prob: {top_prob:.2f} | Margin: {margin:.2f}")
+
+    if top_prob > 0.95:
+        print("[WARNING] High confidence — possible overconfidence")
+    elif margin < 0.2:
+        print("[WARNING] Low margin — drawing may be ambiguous")
+
     return {"Square": float(probs[0]), "Triangle": float(probs[1]), "Circle": float(probs[2])}
-
 # Launch UI
 interface = gr.Interface(
     fn=predict_shape,
