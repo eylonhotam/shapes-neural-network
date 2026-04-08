@@ -3,9 +3,10 @@
 A PyTorch CNN that classifies hand-drawn shapes — **squares**, **triangles**, and **circles** — in real time via an interactive Gradio sketchpad interface.
 
 ---
-## Try it here! 
 
-**Demo Link is Live** - https://huggingface.co/spaces/eylonhotam/shapes-neural-network
+## 🚀 Live Demo
+**Try it here:** [Hugging Face Spaces - ShapeWaveNet](https://huggingface.co/spaces/eylonhotam/shapes-neural-network)
+
 ---
 
 ## Project Structure
