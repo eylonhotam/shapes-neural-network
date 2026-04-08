@@ -11,6 +11,7 @@ shapes-neural-network/
 ├── model.py    # ShapeWaveNet CNN architecture
 ├── train.py    # Synthetic data generation, training loop, model saving
 ├── app.py      # Gradio inference UI with temperature scaling
+├── requirements.txt      
 └── README.md
 ```
 
@@ -121,7 +122,7 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 
 ## Roadmap / Future Steps
 
-- [ ] **`requirements.txt`** — pin dependency versions for reproducible installs
+- [x] **`requirements.txt`** — pin dependency versions for reproducible installs
 - [ ] **Add more shape classes** — pentagon, star, arrow, cross
 - [ ] **Real dataset support** — integrate Google Quick, Draw! data alongside synthetic images to improve robustness on actual handwriting
 - [ ] **Per-class accuracy logging** — add a confusion matrix at the end of training to identify which shape is hardest to classify
