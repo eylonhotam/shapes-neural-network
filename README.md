@@ -3,6 +3,10 @@
 A PyTorch CNN that classifies hand-drawn shapes — **squares**, **triangles**, and **circles** — in real time via an interactive Gradio sketchpad interface.
 
 ---
+## Try it here! 
+
+**Demo Link is Live** - https://huggingface.co/spaces/eylonhotam/shapes-neural-network
+---
 
 ## Project Structure
 
@@ -123,11 +127,12 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 ## Roadmap / Future Steps
 
 - [x] **`requirements.txt`** — pin dependency versions for reproducible installs
+- [x] **Hugging Face Spaces deployment** — host the Gradio app publicly without needing a local tunnel 
 - [ ] **Add more shape classes** — pentagon, star, arrow, cross
 - [ ] **Real dataset support** — integrate Google Quick, Draw! data alongside synthetic images to improve robustness on actual handwriting
 - [ ] **Per-class accuracy logging** — add a confusion matrix at the end of training to identify which shape is hardest to classify
 - [ ] **Learning rate scheduler** — experiment with `CosineAnnealingLR` or `ReduceLROnPlateau` for better convergence
-- [ ] **Hugging Face Spaces deployment** — host the Gradio app publicly without needing a local tunnel
+
 
 ---
 
