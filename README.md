@@ -5,6 +5,7 @@ A PyTorch CNN that classifies hand-drawn shapes — **squares**, **triangles**, 
 ---
 
 ## 🚀 Live Demo
+![Live Demo Gif](./assets/demo.gif)
 **Try it here:** [Hugging Face Spaces - ShapeWaveNet](https://huggingface.co/spaces/eylonhotam/shapes-neural-network)
 
 ---
