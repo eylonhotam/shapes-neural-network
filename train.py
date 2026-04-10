@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from model import ShapeWaveNet
 
 # ── Config ────────────────────────────────────────────────────────────────────
-NUM_SAMPLES   = 4000
+NUM_SAMPLES   = 10000
 BATCH_SIZE    = 64
 EPOCHS        = 50
 LEARNING_RATE = 0.001
@@ -43,9 +43,9 @@ def generate_shape_data(num_samples: int = NUM_SAMPLES):
             cv2.circle(img, (cx, cy), size, 255, thickness)
 
         # Random rotation for augmentation
-        angle = np.random.randint(-30, 30)
+        angle = np.random.randint(-180, 180)
         M = cv2.getRotationMatrix2D((32, 32), angle, 1.0)
-        img = cv2.warpAffine(img, M, (64, 64))
+        img = cv2.warpAffine(img, M, (64, 64), borderMode=cv2.BORDER_REPLICATE)
 
         images.append(img)
         labels.append(shape_type)
