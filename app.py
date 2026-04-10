@@ -2,11 +2,12 @@ import torch
 import numpy as np
 import cv2
 import gradio as gr
-from model import ShapeWaveNet
+
 
 # ── Config ────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "shapewavenet.pth"
 TEMPERATURE  = 2.0   # Softmax temperature — higher = less overconfident
+DEBUG        = True  # Saves debug_input.png so you can inspect preprocessed input
 # ──────────────────────────────────────────────────────────────────────────────
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,18 +27,46 @@ def predict_shape(data):
         - Convert RGB to grayscale
         - Resize to 64x64
         - Invert if background is white (sketchpad default)
+        - Slight Gaussian blur to match training augmentation
         - Normalize to [0, 1]
 
     Temperature scaling is applied before softmax to reduce overconfidence.
     """
     # Preprocess
-    img_array = np.array(data["composite"][:, :, :3])
-    gray      = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-    resized   = cv2.resize(gray, (64, 64))
+    if isinstance(data, dict):
+        img_array = np.array(data["composite"][:, :, :3])
+    else:
+        img_array = np.array(data[:, :, :3])
+
+    gray    = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    resized = cv2.resize(gray, (64, 64))
 
     # Invert if needed — model trained on white-on-black
     if resized.mean() > 127:
         resized = 255 - resized
+
+    if resized.max() > 0:
+        resized = (resized.astype(float) / resized.max() * 120).astype(np.uint8)
+
+    # After inversion, crop to content and resize to fill frame
+    coords = cv2.findNonZero(resized)
+    if coords is not None:
+        x, y, w, h = cv2.boundingRect(coords)
+        padding = 4
+        x = max(0, x - padding)
+        y = max(0, y - padding)
+        w = min(64 - x, w + padding * 2)
+        h = min(64 - y, h + padding * 2)
+        cropped = resized[y:y+h, x:x+w]
+        resized = cv2.resize(cropped, (64, 64), interpolation=cv2.INTER_AREA)
+
+    # Slight blur to match training augmentation
+    resized = cv2.GaussianBlur(resized, (3, 3), 0)
+
+    # Save debug image so you can inspect what the model actually sees
+    if DEBUG:
+        cv2.imwrite("debug_input.png", resized)
+        print(f"[DEBUG] Saved debug_input.png | Mean pixel: {resized.mean():.2f} | Max: {resized.max()}")
 
     tensor_img = torch.tensor(resized).float().unsqueeze(0).unsqueeze(0) / 255.0
 
@@ -74,7 +103,7 @@ interface = gr.Interface(
     description=(
         "Draw a square, triangle, or circle in the sketchpad. "
         "The model returns confidence scores in real time.\n\n"
-        "Tips: Use thick, clear strokes. Close your shapes fully for best results."
+        "Tips: Use thin, clear strokes. Close your shapes fully for best results."
     )
 )
 
