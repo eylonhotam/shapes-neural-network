@@ -16,7 +16,7 @@ A PyTorch CNN that classifies hand-drawn shapes — **squares**, **triangles**, 
 ```
 shapes-neural-network/
 ├── model.py    # ShapeWaveNet CNN architecture
-├── train.py    # Synthetic data generation, training loop, model saving
+├── train.py    # Google Quick, Draw access, training loop, model saving
 ├── app.py      # Gradio inference UI with temperature scaling
 ├── requirements.txt      
 └── README.md
@@ -26,7 +26,7 @@ shapes-neural-network/
 
 ## How It Works
 
-**`train.py`** generates 4,000 synthetic 64×64 grayscale shape images using OpenCV — **no external dataset needed**. Each shape is randomized in position, size, stroke thickness, and rotation (±30°). The model trains for 50 epochs with an 80/20 train/val split and saves weights to `shapewavenet.pth` when done.
+**`train.py`** accesses 15,000 images of each class from the Google Quick, Draw dataset. The model trains for 30 epochs with an 80/20 train/val split and saves weights to `shapewavenet.pth` when done.
 
 **`model.py`** defines `ShapeWaveNet`, a lightweight two-block CNN with dropout regularization that outputs logits over three classes.
 
@@ -37,8 +37,7 @@ shapes-neural-network/
 
 | Choice | Reason |
 |---|---|
-| Synthetic data generation | No external dataset needed; full control over shape variation |
-| Random position, size, thickness, rotation | Improves generalization to real hand-drawn input |
+| Google Quick Draw Dataset | Accesses and trains off the world's largest doodle dataset |
 | DataLoader with `shuffle=True` | Prevents the model from memorizing class order |
 | 80/20 train/val split | Tracks generalization throughout training |
 | Dropout at 0.25 + 0.50 | Regularization in both the feature extractor and classifier heads |
@@ -103,7 +102,7 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 **`train.py`**
 | Variable | Default | Description |
 |---|---|---|
-| `NUM_SAMPLES` | `4000` | Total synthetic images generated |
+| `NUM_SAMPLES` | `45000` | Total images accessed and trained off |
 | `BATCH_SIZE` | `64` | Training batch size |
 | `EPOCHS` | `50` | Number of training epochs |
 | `LEARNING_RATE` | `0.001` | Adam optimizer learning rate |
@@ -120,7 +119,7 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 
 ## Usage Tips
 
-- Draw with **thick, clear strokes** — the model was trained on outline-style shapes, not filled ones.
+- Draw with **thin, clear strokes** — the model was trained on outline-style shapes, not filled ones.
 - **Close your shapes fully** — open corners on squares or triangles can confuse the classifier.
 - The app auto-inverts your drawing if it detects a white background, to match the training format (white shapes on black).
 - If the margin between the top two predictions is under 0.2, the app will log a warning that the drawing may be ambiguous — try redrawing more deliberately.
@@ -131,8 +130,8 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 
 - [x] **`requirements.txt`** — pin dependency versions for reproducible installs
 - [x] **Hugging Face Spaces deployment** — host the Gradio app publicly without needing a local tunnel 
+- [x] **Real dataset support** — integrate Google Quick, Draw! data to improve robustness on actual handwriting
 - [ ] **Add more shape classes** — pentagon, star, arrow, cross
-- [ ] **Real dataset support** — integrate Google Quick, Draw! data alongside synthetic images to improve robustness on actual handwriting
 - [ ] **Per-class accuracy logging** — add a confusion matrix at the end of training to identify which shape is hardest to classify
 - [ ] **Learning rate scheduler** — experiment with `CosineAnnealingLR` or `ReduceLROnPlateau` for better convergence
 
