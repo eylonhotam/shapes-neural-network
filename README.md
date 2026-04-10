@@ -141,4 +141,4 @@ Key hyperparameters are defined at the top of each file for easy tuning:
 
 ## Built With
 
-[PyTorch](https://pytorch.org/) · [OpenCV](https://opencv.org/) · [Gradio](https://gradio.app/) · [NumPy](https://numpy.org/)
+[PyTorch](https://pytorch.org/) · [OpenCV](https://opencv.org/) · [Gradio](https://gradio.app/) · [NumPy](https://numpy.org/) · [Google Quick, Draw!](https://quickdraw.withgoogle.com/data)
