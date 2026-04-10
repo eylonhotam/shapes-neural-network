@@ -7,7 +7,7 @@ import gradio as gr
 # ── Config ────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "shapewavenet.pth"
 TEMPERATURE  = 2.0   # Softmax temperature — higher = less overconfident
-DEBUG        = True  # Saves debug_input.png so you can inspect preprocessed input
+DEBUG        = False  # Saves debug_input.png so you can inspect preprocessed input
 # ──────────────────────────────────────────────────────────────────────────────
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
