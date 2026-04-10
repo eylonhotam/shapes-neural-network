@@ -1,66 +1,85 @@
+import cv2
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import cv2
 from torch.utils.data import DataLoader, TensorDataset
-from model import ShapeWaveNet
 
 # ── Config ────────────────────────────────────────────────────────────────────
-NUM_SAMPLES   = 10000
+NUM_SAMPLES   = 15000   # per class
 BATCH_SIZE    = 64
-EPOCHS        = 50
+EPOCHS        = 30
 LEARNING_RATE = 0.001
 VAL_SPLIT     = 0.8
 SAVE_PATH     = "shapewavenet.pth"
 # ──────────────────────────────────────────────────────────────────────────────
 
+# Maps class index to label and Quick Draw name
+CLASSES = {
+    0: "square",
+    1: "triangle",
+    2: "circle"
+}
+
 
 def generate_shape_data(num_samples: int = NUM_SAMPLES):
     """
-    Generates synthetic 64x64 grayscale images of squares, triangles, and circles.
-    Shapes are randomized in position, size, stroke thickness, and rotation angle.
-    No external dataset required.
+    Downloads hand-drawn shape images from the Quick Draw dataset.
+    Each class gets num_samples drawings — 15000 total for 3 classes.
+    Images are resized to 64x64 grayscale, white shape on black background.
+    Requires: pip install quickdraw
     """
+    try:
+        from quickdraw import QuickDrawDataGroup
+    except ImportError:
+        raise ImportError(
+            "quickdraw package not found. Install it with: pip install quickdraw"
+        )
+
     images, labels = [], []
-    print(f"[DATA] Generating {num_samples} synthetic shapes...")
 
-    for _ in range(num_samples):
-        img = np.zeros((64, 64), dtype=np.uint8)
-        shape_type = np.random.randint(0, 3)
-        cx, cy     = np.random.randint(20, 44), np.random.randint(20, 44)
-        size       = np.random.randint(10, 20)
-        thickness  = np.random.randint(1, 3)
+    for label, name in CLASSES.items():
+        print(f"[DATA] Downloading '{name}' drawings ({num_samples} samples)...")
+        group = QuickDrawDataGroup(name, max_drawings=num_samples, recognized=True)
 
-        if shape_type == 0:   # Square
-            cv2.rectangle(img, (cx - size, cy - size), (cx + size, cy + size), 255, thickness)
+        count = 0
+        for drawing in group.drawings:
+            # Convert PIL image to grayscale numpy array at 64x64
+            img = np.array(drawing.image.convert("L").resize((64, 64)))
 
-        elif shape_type == 1: # Triangle
-            pts = np.array([[cx, cy - size], [cx - size, cy + size], [cx + size, cy + size]], np.int32)
-            cv2.polylines(img, [pts], True, 255, thickness)
+            # Quick Draw is black-on-white — invert to white-on-black
+      
+            img = 255 - img
 
-        else:                 # Circle
-            cv2.circle(img, (cx, cy), size, 255, thickness)
+            # Random rotation so model handles all orientations
+            angle = np.random.randint(0, 360)
+            center = (32, 32)
+            M = cv2.getRotationMatrix2D(center, angle, 1.0)
+            img = cv2.warpAffine(img, M, (64, 64), borderMode=cv2.BORDER_CONSTANT, borderValue=0)
 
-        # Random rotation for augmentation
-        angle = np.random.randint(-180, 180)
-        M = cv2.getRotationMatrix2D((32, 32), angle, 1.0)
-        img = cv2.warpAffine(img, M, (64, 64), borderMode=cv2.BORDER_REPLICATE)
+            images.append(img)
+            labels.append(label)
+            count += 1
+            if count >= num_samples:
+                break
 
-        images.append(img)
-        labels.append(shape_type)
+        print(f"[DATA] Loaded {count} '{name}' drawings.")
 
     X = torch.tensor(np.array(images)).float().unsqueeze(1) / 255.0
     y = torch.tensor(labels).long()
 
-    print(f"[DATA] Shape: {X.shape} | Min: {X.min():.2f} | Max: {X.max():.2f}")
+    print(f"\n[DATA] Total shape: {X.shape} | Min: {X.min():.2f} | Max: {X.max():.2f}")
     return X, y
 
 
 def get_loaders(X, y):
-    split      = int(VAL_SPLIT * len(X))
-    train_ds   = TensorDataset(X[:split], y[:split])
-    val_ds     = TensorDataset(X[split:], y[split:])
+    # Shuffle before splitting to prevent class skew in val set
+    perm = torch.randperm(len(X))
+    X, y = X[perm], y[perm]
+
+    split        = int(VAL_SPLIT * len(X))
+    train_ds     = TensorDataset(X[:split], y[:split])
+    val_ds       = TensorDataset(X[split:], y[split:])
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
     val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False)
 
@@ -70,11 +89,24 @@ def get_loaders(X, y):
 
 def evaluate(model, val_loader, val_ds, device):
     model.eval()
-    correct = 0
+    correct       = 0
+    class_correct = [0, 0, 0]
+    class_total   = [0, 0, 0]
+
     with torch.no_grad():
         for vx, vy in val_loader:
             preds = torch.max(model(vx.to(device)), 1)[1]
             correct += (preds == vy.to(device)).sum().item()
+            for t, p in zip(vy, preds.cpu()):
+                class_correct[t] += (t == p).item()
+                class_total[t]   += 1
+
+    names     = [CLASSES[i] for i in range(3)]
+    per_class = " | ".join(
+        f"{names[i]}: {100 * class_correct[i] / class_total[i]:.1f}%"
+        for i in range(3)
+    )
+    print(f"         [{per_class}]")
     return correct / len(val_ds) * 100
 
 
@@ -82,7 +114,7 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[DEVICE] Running on: {device}")
 
-    X_all, y_all             = generate_shape_data()
+    X_all, y_all                     = generate_shape_data()
     train_loader, val_loader, val_ds = get_loaders(X_all, y_all)
 
     model     = ShapeWaveNet().to(device)
@@ -90,6 +122,8 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     print(f"\n[TRAIN] Starting {EPOCHS} epochs...\n")
+
+    best_val_acc = 0
 
     for epoch in range(EPOCHS):
         model.train()
@@ -103,13 +137,18 @@ def train():
             optimizer.step()
             epoch_loss += loss.item()
 
-        if (epoch + 1) % 10 == 0:
-            val_acc = evaluate(model, val_loader, val_ds, device)
+        if (epoch + 1) % 5 == 0:
+            val_acc  = evaluate(model, val_loader, val_ds, device)
             avg_loss = epoch_loss / len(train_loader)
             print(f"  > Epoch {epoch+1:02d} | Avg Loss: {avg_loss:.4f} | Val Acc: {val_acc:.2f}%")
 
-    torch.save(model.state_dict(), SAVE_PATH)
-    print(f"\n[SAVED] Model weights saved to {SAVE_PATH}")
+            # Save best model only
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save(model.state_dict(), SAVE_PATH)
+                print(f"  [SAVED] New best model: {val_acc:.2f}% -> {SAVE_PATH}")
+
+    print(f"\n[DONE] Best val accuracy: {best_val_acc:.2f}%")
 
 
 if __name__ == "__main__":
