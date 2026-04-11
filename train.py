@@ -169,8 +169,8 @@ def evaluate(model, val_loader, val_ds, device):
     print(f"         [{per_class}]")
     return correct / len(val_ds) * 100
 
-""" For saving model to Google Drive
-def save_model(model, path):
+
+def save_model(model, path): #Saving model to Google Drive / Download
     torch.save(model.state_dict(), path)
     print(f"[SAVED] Model saved to {path}")
 
@@ -190,7 +190,7 @@ def save_model(model, path):
 
     except ImportError:
         pass
-"""
+
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
