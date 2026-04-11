@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import cv2
 import gradio as gr
-
+from model import ShapeWaveNet
 
 # ── Config ────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "shapewavenet.pth"
@@ -77,7 +77,7 @@ def predict_shape(data):
 
     tensor_img = torch.tensor(resized).float().unsqueeze(0).unsqueeze(0) / 255.0
 
-     if DEBUG_WEIGHTS:
+    if DEBUG_WEIGHTS:
         print("[INPUT STATS] mean:", tensor_img.mean().item(), "max:", tensor_img.max().item())
     
     # Inference with temperature scaling
