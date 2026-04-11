@@ -7,7 +7,8 @@ import gradio as gr
 # ── Config ────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "shapewavenet.pth"
 TEMPERATURE  = 2.0   # Softmax temperature — higher = less overconfident
-DEBUG        = False  # Saves debug_input.png so you can inspect preprocessed input
+DEBUG_IMG        = False  # Saves debug_input.png so you can inspect preprocessed input
+DEBUG_WEIGHTS    = False  # Prints statements regarding weights for inspection
 # ──────────────────────────────────────────────────────────────────────────────
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -15,6 +16,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ShapeWaveNet().to(device)
 model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device, weights_only=True))
 model.eval()
+
+if DEBUG_WEIGHTS:
+    p = list(model.parameters())
+    print("[W0]", p[0].flatten()[:5])
+    print("[W1]", p[1].flatten()[:5])
+
 print(f"[LOADED] Model loaded from {WEIGHTS_PATH} | Device: {device}")
 
 
@@ -64,12 +71,15 @@ def predict_shape(data):
     resized = cv2.GaussianBlur(resized, (3, 3), 0)
 
     # Save debug image so you can inspect what the model actually sees
-    if DEBUG:
+    if DEBUG_IMG:
         cv2.imwrite("debug_input.png", resized)
         print(f"[DEBUG] Saved debug_input.png | Mean pixel: {resized.mean():.2f} | Max: {resized.max()}")
 
     tensor_img = torch.tensor(resized).float().unsqueeze(0).unsqueeze(0) / 255.0
 
+     if DEBUG_WEIGHTS:
+        print("[INPUT STATS] mean:", tensor_img.mean().item(), "max:", tensor_img.max().item())
+    
     # Inference with temperature scaling
     with torch.no_grad():
         logits = model(tensor_img.to(device))
