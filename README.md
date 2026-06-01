@@ -56,6 +56,9 @@ Training combines two data sources: 5,000 synthetic 64×64 grayscale images per 
 ```
 
 ---
+## Model Performance
+![Confusion Matrix](assets/confusion-matrix.png)
+
 
 ## Setup
 
