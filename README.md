@@ -118,7 +118,7 @@ shapes-neural-network/
 | Epochs | 30 |
 | Learning rate | 0.001 |
 | Val split | 20% |
-| Accurary | 94.6%|
+| Accuracy | 94.6%|
 
 ---
 
