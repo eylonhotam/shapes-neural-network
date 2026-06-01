@@ -136,8 +136,8 @@ shapes-neural-network/
 - [x] **`requirements.txt`** — pin dependency versions for reproducible installs
 - [x] **Hugging Face Spaces deployment** — host the Gradio app publicly without needing a local tunnel 
 - [x] **Real dataset support** — integrate Google Quick, Draw! data alongside synthetically generated data to improve robustness on actual handwriting
-- [ ] **Add more shape classes** — pentagon, star, arrow, cross
 - [x] **Per-class accuracy logging** — add a confusion matrix at the end of training to identify which shape is hardest to classify
+- [ ] **Add more shape classes** — pentagon, star, arrow, cross
 - [ ] **Learning rate scheduler** — experiment with `CosineAnnealingLR` or `ReduceLROnPlateau` for better convergence
 
 ---
