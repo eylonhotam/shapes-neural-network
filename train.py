@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
-from model import ShapeWaveNet
+import matplotlib.pyplot as plt
 
 # ── Config ────────────────────────────────────────────────────────────────────
 QUICKDRAW_SAMPLES  = 10000  # per class
@@ -170,7 +170,7 @@ def evaluate(model, val_loader, val_ds, device):
     return correct / len(val_ds) * 100
 
 
-def save_model(model, path): #Saving model to Google Drive / Download
+def save_model(model, path):
     torch.save(model.state_dict(), path)
     print(f"[SAVED] Model saved to {path}")
 
@@ -238,6 +238,33 @@ def train():
 
     print(f"\n[DONE] Best val accuracy: {best_val_acc:.2f}%")
     print(f"[DONE] Final model saved to: {SAVE_PATH}")
+
+    # --- Confusion Matrix ---
+    model.load_state_dict(torch.load(SAVE_PATH, map_location=device))
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for vx, vy in val_loader:
+            preds = torch.max(model(vx.to(device)), 1)[1]
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(vy.numpy())
+
+    cm = np.zeros((3, 3), dtype=int)
+    for true, pred in zip(all_labels, all_preds):
+        cm[true][pred] += 1
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(cm, cmap="Blues")
+    plt.colorbar(im)
+    labels = ["Square", "Triangle", "Circle"]
+    ax.set_xticks(range(3)); ax.set_xticklabels(labels)
+    ax.set_yticks(range(3)); ax.set_yticklabels(labels)
+    ax.set_xlabel("Predicted"); ax.set_ylabel("True")
+    ax.set_title("Validation Confusion Matrix")
+    for i in range(3):
+        for j in range(3):
+            ax.text(j, i, cm[i][j], ha="center", va="center", color="black")
+    plt.show()
 
 
 if __name__ == "__main__":
