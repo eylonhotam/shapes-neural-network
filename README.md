@@ -51,7 +51,7 @@ Training combines two data sources: 5,000 synthetic 64×64 grayscale images per 
 ├──────────────────────────────────────────────────────────────────────┤
 │  4. Inference                                                        │
 │  Gradio sketchpad → grayscale → 64×64 → model.eval()                 │
-│  → temperature scaling (T=1.0) → softmax → confidence scores         │
+│  → temperature scaling (T=2.0) → softmax → confidence scores         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
